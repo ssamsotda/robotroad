@@ -98,6 +98,9 @@ button{font-family:inherit;cursor:pointer;border:0;color:inherit}
 .rule b{color:var(--coral);font-weight:400}
 .play{flex:1;min-height:0;display:flex;flex-direction:row;overflow-y:auto}
 #boardWrap{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;padding:8px}
+#bonusBtn{display:block;margin:12px auto 0;max-width:560px;width:100%;border-radius:22px;padding:12px 18px;font-size:20px;font-weight:900;background:linear-gradient(135deg,#7b5cff,#ff6bd5);color:#fff;box-shadow:0 5px 0 #4a34b8}
+#bonusBtn.lock{background:#e6ebf5;color:#8c97b5;box-shadow:0 5px 0 #c3cce0}
+#bonusBtn small{display:block;font-size:.7em;font-weight:700;opacity:.9;margin-top:2px}
 #ruleBig{flex:none;background:#ff6b5e;color:#fff;font-weight:900;font-size:26px;padding:8px 24px;border-radius:999px;box-shadow:0 5px 0 #c94a3e;text-align:center;animation:rbpop .5s}
 #ruleBig[hidden]{display:none}
 @keyframes rbpop{0%{transform:scale(.6);opacity:0}70%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
@@ -299,6 +302,7 @@ button{font-family:inherit;cursor:pointer;border:0;color:inherit}
   <div id="homeItems"></div>
   <div class="levels" id="levels"></div>
   <div class="stage-grid" id="stageGrid"></div>
+  <button id="bonusBtn" class="bonus"></button>
   <div class="home-bottom">
     <button class="btn gold" id="btnShop">🏅 도장판 보기</button>
     <button class="btn navy" id="btnNew">🔄 새로 시작</button>
@@ -371,6 +375,7 @@ button{font-family:inherit;cursor:pointer;border:0;color:inherit}
     <div class="gstamps" id="gStamps"></div>
     <div class="robot dance" id="gRobot" data-mood="happy"></div>
     <button class="btn gold" id="gOk">계속하기 ▶</button>
+    <button class="btn" id="gBonus" hidden style="margin-top:10px;background:linear-gradient(135deg,#7b5cff,#ff6bd5);color:#fff">♾️ 무한 도전 하러 가기!</button>
   </div>
 </div>
 <canvas id="confetti"></canvas>
@@ -474,6 +479,7 @@ const STAGES=[
   {id:5,icon:'🔧',title:'고장난 로봇길 고치기',kind:'repair',shapes:['snake3x2','U2x3','C3x3']}
 ];
 const NS=STAGES.length,TOT=NS*3;
+const BONUS={id:6,icon:'♾️',title:'무한 도전',kind:'random',special:true};
 const SHAPES={
   snake3x2:{cols:3,rows:2,cells:[[0,0],[1,0],[2,0],[2,1],[1,1],[0,1]]},
   snake4x2:{cols:4,rows:2,cells:[[0,0],[1,0],[2,0],[3,0],[3,1],[2,1],[1,1],[0,1]]},
@@ -524,7 +530,7 @@ function buildPuzzle(st){
   let mode=st.mode,step=st.step,kind=st.kind||'build',given=st.given||2,keys=st.shapes;
   if(kind==='detective'){mode=pick(['+','-']);step=pick([1,-1,2,-2]);given=2;}
   if(kind==='repair'){mode=pick(['+','-']);step=pick([1,-1]);}
-  if(kind==='random'){mode=pick(['+','-']);step=pick([1,-1]);given=pick([1,2]);keys=['snake3x2','snake4x2','U2x3','C3x3','Z3x3','stair','corner5'];}
+  if(kind==='random'){mode=pick(['+','-']);step=pick([1,-1]);given=pick([1,2]);keys=['snake3x2','U2x3','C3x3','stair','corner5'];}
   const lv=save.level||2;NOTEN=lv>=2;
   if(lv>=2&&(kind==='build'||kind==='random')){keys=['snake3x2','U2x3','C3x3'];}
   if(lv>=2&&kind!=='detective')given=1;
@@ -632,6 +638,9 @@ function renderHome(){
     b.addEventListener('click',()=>{ac();if(cleared(st.id,save.level||2)){sfx.bad();toast('이미 도장을 받았어요! 다음 미션에 도전해 보세요 🏅');return;}if(st.id>nid){sfx.bad();toast(`${nid}번 미션부터 차례로 도전해요! 🔒`);return;}sfx.tap();startStage(st);});
     grid.appendChild(b);
   });
+  {const bb=$('#bonusBtn'),op=totalCount()===TOT,n=save.bonus||0;bb.className='bonus'+(op?'':' lock');
+   bb.innerHTML=op?`♾️ 무한 도전 <small>${n?n+'판 성공! ':''}문제가 계속 새로 나와요 · 얼마나 풀 수 있을까?</small>`:`🔒 ♾️ 무한 도전 <small>도장 ${TOT}개를 모두 모으면 열려요!</small>`;
+   bb.onclick=()=>{ac();if(!op){sfx.bad();toast(`도장 ${TOT}개를 모두 모으면 열려요! 🔒`);return;}sfx.tap();startStage(BONUS);};}
   updateCoins();updateSoundBtns();
 }
 
@@ -802,7 +811,7 @@ function renderBoard(){
   // 로봇
   const rb=document.createElement('div');rb.id='robot';rb.className='robot notrans';rb.dataset.mood=G.mood||'normal';
   mountRobot(rb);board.appendChild(rb);
-  rb.addEventListener('click',()=>{ac();sfx.beep();rb.classList.remove('shake');void rb.offsetWidth;rb.classList.add('shake');say(pick(['삐빅! 안녕하세요!','저를 도착 지점까지 데려다 주세요!','계산은 자신 있죠? 힘내요!','충전 완료! 출발 준비 끝!']),'info');setTimeout(()=>rb.classList.remove('shake'),500);});
+  rb.addEventListener('click',()=>{if(G&&!G.busy&&!G.done&&G.kind!=='repair'&&G.pos>=0&&G.pos<G.n&&G.cells[G.pos].status==='done'){onCellTap(G.pos);return;}ac();sfx.beep();rb.classList.remove('shake');void rb.offsetWidth;rb.classList.add('shake');say(pick(['삐빅! 안녕하세요!','저를 도착 지점까지 데려다 주세요!','계산은 자신 있죠? 힘내요!','충전 완료! 출발 준비 끝!']),'info');setTimeout(()=>rb.classList.remove('shake'),500);});
   setRobotPos(G.pos,false);
   refreshArrows();
   for(let i=0;i<G.n;i++)refreshCell(i);
@@ -818,13 +827,13 @@ function refreshCell(i){
   const el=$(`.cell[data-i="${i}"]`);if(!el)return;
   const cl=G.cells[i];
   let a=cl.a,b=cl.b,c=cl.c;
-  if(G.sel===i&&(cl.status==='todo'||cl.status==='broken')){a=ed.a;b=ed.b;c=ed.c;}
+  if(G.sel===i&&(cl.status==='todo'||cl.status==='broken'||cl.re)){a=ed.a;b=ed.b;c=ed.c;}
   const f=fmt(a,b,c);
   el.querySelector('.eqtxt').innerHTML=f.empty?`<span class="empty">${f.txt}</span>`:f.txt;
   el.classList.toggle('given',cl.status==='given');
   el.classList.toggle('done',cl.status==='done');
   el.classList.toggle('broken',cl.status==='broken');
-  el.classList.toggle('cur',G.sel===i&&G.kind!=='repair'&&cl.status==='todo');
+  el.classList.toggle('cur',G.sel===i&&G.kind!=='repair'&&(cl.status==='todo'||!!cl.re));
   el.classList.toggle('sel',G.sel===i&&G.kind==='repair'&&cl.status==='broken');
 }
 function setMood(m,ms){
@@ -859,6 +868,10 @@ function onCellTap(i){
   if(cl.status==='todo'){
     if(i===G.cur)selectCell(i);
     else{shakeCell(i);say('앞 칸부터 차례대로 써 봐요!','bad');sfx.bad();}
+  }else if(cl.status==='done'&&!G.done&&!G.busy){
+    // 이미 쓴 칸(내가 쓴 식)은 다시 눌러서 고칠 수 있어요
+    selectCell(i,true);
+    say('✏️ 이 칸을 다시 써 볼까요? 다른 식으로 바꿔도 좋아요!','info');
   }else{
     say(`${fmtFull(cl)} → ${word(G.mode)}은 ${cl.c}이에요.`,'info');
   }
@@ -903,9 +916,9 @@ function ensureVisible(i){
     else if(c.top<top+4)play.scrollTop-=top+4-c.top;
   }catch(e){}
 }
-function selectCell(i){
-  if(G.sel>=0&&G.sel!==i){const old=G.sel;G.sel=-1;refreshCell(old);}
-  G.sel=i;const cl=G.cells[i];
+function selectCell(i,redo){
+  if(G.sel>=0&&G.sel!==i){const old=G.sel;G.sel=-1;G.cells[old].re=false;refreshCell(old);}
+  G.sel=i;const cl=G.cells[i];cl.re=!!redo;
   ed={a:cl.status==='broken'?cl.a:'',b:cl.status==='broken'?cl.b:'',c:cl.status==='broken'?cl.c:'',active:'a',fresh:true};
   setEditorEnabled(true);renderEditor();startTimer();ensureVisible(i);
 }
@@ -1004,6 +1017,12 @@ async function onOk(){
     await finish(g);return;
   }
   // 일반 스테이지
+  if(cl.re){ // 앞 칸을 고친 경우: 로봇은 그대로, 다음 빈 칸으로
+    cl.re=false;refreshCell(i);await sleep(250);if(G!==g)return;
+    const nx2=G.cells.findIndex(c=>c.status==='todo');
+    G.cur=nx2;G.busy=false;selectCell(nx2);
+    say('잘 고쳤어요! 이제 이어서 다음 칸에 도전! ✏️','ok');return;
+  }
   await sleep(250);if(G!==g)return;
   await hopTo(i);if(G!==g)return;
   if(cl.coin&&!cl.got){cl.got=true;const gift=cl.gift;addCoins(gift?gain+5:gain,i,gift);const ce=$(`.cell[data-i="${i}"] .coin`);if(ce)ce.classList.add('got');}
@@ -1050,6 +1069,15 @@ async function hintTest(){
   G.busy=false;
 }
 
+/* ================= 무한 도전 ================= */
+function bonusDone(g){
+  stopTimer();save.bonus=(save.bonus||0)+1;const e=5+g.lv*2;save.coins+=e;persist();updateCoins();
+  $('#resRule').textContent=`${ruleText(g.mode,g.step)} 길을 완성했어요!`;
+  $('#resStamp').textContent=`♾️ 무한 도전 ${save.bonus}판 성공!`;
+  $('#resItem').textContent='';$('#resReward').textContent=`⚡ 에너지 +${e}`;
+  mountRobot($('#resRobot'));$('#resNext').textContent='한 판 더! ▶';
+  $('#result').classList.add('show');burst();
+}
 /* ================= 끝 ================= */
 async function finish(g){
   setMood('happy');const rb=$('#robot');if(rb)rb.classList.add('dance');
@@ -1058,6 +1086,7 @@ async function finish(g){
   await sleep(1300);if(G!==g)return;
   let stars=1;
   if(g.mistakes===0&&g.hints===0)stars=3;else if(g.mistakes<=2&&g.hints<=1)stars=2;
+  if(g.stage.kind==='random'){bonusDone(g);return;}
   const bonus=stars*3*(g.lv||1);save.coins+=bonus;g.earned+=bonus;
   stopTimer();const key=g.stage.id+'_'+g.lv;const had=(save.stars[key]||0)>0;const prevTot=totalCount();if((save.stars[key]||0)<stars)save.stars[key]=stars;
   persist();updateCoins();
@@ -1110,6 +1139,7 @@ $('#batReset').addEventListener('click',()=>{
 $('#btnHome').addEventListener('click',()=>{ac();sfx.tap();G=null;closeResult();renderHome();show('home');});
 $('#resHome').addEventListener('click',()=>{sfx.tap();G=null;closeResult();renderHome();show('home');});
 $('#resNext').addEventListener('click',()=>{
+  if(G&&G.stage&&G.stage.kind==='random'){sfx.tap();closeResult();startStage(BONUS);return;}
   sfx.tap();const lv=G.lv,id=G.stage.id;closeResult();
   const nx=STAGES.find(st=>!cleared(st.id,lv));
   if(nx){save.level=lv;persist();startStage(nx);}
@@ -1137,6 +1167,7 @@ function grand(lv,master){
   $$('#grand .spark').forEach(e=>e.remove());
   for(let i=0;i<18;i++){const e=document.createElement('div');e.className='spark';e.textContent=pick(['✨','⭐','🌟','💫']);
     e.style.left=Math.random()*96+'%';e.style.top=Math.random()*92+'%';e.style.fontSize=(18+Math.random()*30)+'px';e.style.animationDelay=(Math.random()*1.4)+'s';$('#grand').appendChild(e);}
+  $('#gBonus').hidden=!master;
   $('#grand').classList.add('show');
   sfx.grand();stopFw();let n=0;
   const fire=()=>firework(innerWidth*(.15+Math.random()*.7),innerHeight*(.15+Math.random()*.4));
@@ -1145,6 +1176,7 @@ function grand(lv,master){
   burst();
 }
 $('#gOk').addEventListener('click',()=>{sfx.tap();stopFw();$('#grand').classList.remove('show');});
+$('#gBonus').addEventListener('click',()=>{sfx.tap();stopFw();$('#grand').classList.remove('show');closeResult();startStage(BONUS);});
 let nwT=0;
 $('#btnNew').addEventListener('click',e=>{
   const b=e.currentTarget;ac();
@@ -1175,7 +1207,7 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='Backspace'){e.preventDefault();del();}
   else if(e.key==='Enter'){e.preventDefault();onOk();}
 });
-window.__rr=()=>G;
+window.__rr=()=>G;window.__ri=()=>robotInner();window.__sv=()=>save;
 renderHome();
 })();
 </script>
